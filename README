@@ -1,0 +1,80 @@
+The app runs on 3 different services, orchestrator, ingestion and inference. They communicate over internal network ports (eg, localhost:8000, 8001, 8002)
+--------------------------------------------------------------------------------------------
+Orchestrator (Django):
+
+Central Django application, manages the database which stores user profiles, file metadata (which PDFs are in the vault), and chat history.
+
+Responsibilities:
+
+- monitors the 'vault' folder, when user drops a file in, it notices and triggers the Ingestion service
+
+- receives user input from GUI, fetches relevant metadata and sends a "package" of information to the Inference service
+
+- single point of contact for GUI and the backend services
+---------------------------------------------------------------------------------------------
+Ingestion (FastAPI):
+
+responsible for turning unstructure data (like a 300-page PDF) into structure data that can be searched.
+
+Responsibilities:
+
+- extracting raw text from PDFs, Word docs and PDF files
+
+- break long book into smaller paragraphs
+
+- using a small embedding model to turn text chunks into vectors (long lists of numbers representing the meaning of the text)
+
+- save the numbers into db
+---------------------------------------------------------------------------------------------
+Inference (FastAPI):
+
+this is where the LLM lives. This services generates the content
+
+Responsibilities:
+
+- It takes the user input and the relevant snippets found by Ingestion service
+
+- reads the snippets to ensure the answer is grounded to user's personal files
+
+- generate content
+
+- send the answer back to orchestrator piece by piece so the user sees the text "typing" in real time
+---------------------------------------------------------------------------------------------
+How they work together:
+
+1) User types: "How do I start a Django project?" into the GUI.
+
+2) Orchestrator receives the query and asks the Ingestion Service: "Find me chunks related to 'starting Django' in the vault."
+
+3) Ingestion Service returns 3 snippets from Python Crash Course.
+
+4) Orchestrator sends the Question + 3 Snippets to the Inference Service.
+
+5) Inference Service generates the answer and sends it back.
+
+6) Orchestrator saves the conversation to SQLite and displays it in the GUI.
+
+Basically:
+
+1) Electron GUI: Sends user query to Orchestrator (POST /ask).
+
+2) Orchestrator: Asks Ingestion to "Find 3 relevant paragraphs for this query."
+
+3) Ingestion: Searches the Vector DB and returns the text snippets.
+
+4) Orchestrator: Sends those snippets + the original question to Inference.
+
+5) Inference: Returns the final grounded answer.
+
+6) Orchestrator: Saves the answer to the database and sends it back to Electron.
+
+Note: GUI will be built with Electron.js
+
+---------------------------------------------------------------------------------------------
+Things to consider:
+
+Concurrency: Managing a long-running LLM generation while keeping the UI responsive.
+
+Inter-Process Communication (ICP): How GUI (Electron/JavaScript) talks to Orchestrator (Django/Python) via HTTP.
+
+System Design: Deciding which service owns the data
