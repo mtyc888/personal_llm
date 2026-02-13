@@ -7,7 +7,7 @@ import os
 import uuid
 from pydantic import BaseModel
 import fitz
-nltk.download('punkt')
+nltk.download('punkt_tab')
 
 
 app = FastAPI()
@@ -79,9 +79,11 @@ def readPdf(filePath):
     
 def readTxt(filePath):
     try:
+        txt_dict = {}
         with open(filePath, 'r', encoding='utf-8') as file:
             content = file.read()
-        return content
+            txt_dict[0] = content
+        return txt_dict
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="File not found")
     except Exception as e:
@@ -108,47 +110,48 @@ def chunk(content, max_chars=1000, sentence_overlap=2):
                 })
 
         return all_chunks_with_metadata
-    # handle txt case
-    if not content or not content.strip():
-        return []
+    else:
+        # handle txt case
+        if not content or not content.strip():
+            return []
 
-    sentences = sent_tokenize(content)
-    if not sentences:
-        # fallback if no sentences detected
-        return [content[:max_chars].rsplit(" ", 1)[0]] if len(content) > max_chars else [content]
+        sentences = sent_tokenize(content)
+        if not sentences:
+            # fallback if no sentences detected
+            return [content[:max_chars].rsplit(" ", 1)[0]] if len(content) > max_chars else [content]
 
-    chunks = []
-    i = 0
-    while i < len(sentences):
-        current_chunk = []
-        current_len = 0
-        start_i = i
-
-        # greedily add sentences until we would exceed limit
+        chunks = []
+        i = 0
         while i < len(sentences):
-            sentence = sentences[i]
-            # rough estimate including space
-            added_len = len(sentence) + (1 if current_chunk else 0)
+            current_chunk = []
+            current_len = 0
+            start_i = i
 
-            if current_len + added_len > max_chars:
-                break
+            # greedily add sentences until we would exceed limit
+            while i < len(sentences):
+                sentence = sentences[i]
+                # rough estimate including space
+                added_len = len(sentence) + (1 if current_chunk else 0)
 
-            current_chunk.append(sentence)
-            current_len += added_len
-            i += 1
+                if current_len + added_len > max_chars:
+                    break
 
-        # if we didn't take any sentence → force take at least one
-        if not current_chunk and i < len(sentences):
-            current_chunk = [sentences[i]]
-            i += 1
+                current_chunk.append(sentence)
+                current_len += added_len
+                i += 1
 
-        chunk_text = " ".join(current_chunk).strip()
-        chunks.append(chunk_text)
-        if sentence_overlap > 0:
-            # slide window back by overlap sentences
-            i = max(start_i + 1, i - sentence_overlap)
+            # if we didn't take any sentence → force take at least one
+            if not current_chunk and i < len(sentences):
+                current_chunk = [sentences[i]]
+                i += 1
 
-    return chunks
+            chunk_text = " ".join(current_chunk).strip()
+            chunks.append(chunk_text)
+            if sentence_overlap > 0:
+                # slide window back by overlap sentences
+                i = max(start_i + 1, i - sentence_overlap)
+
+        return chunks
 
 def embedding(chunks):
     embeddings = model.encode(chunks)
