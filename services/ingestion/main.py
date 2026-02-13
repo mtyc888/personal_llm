@@ -7,7 +7,7 @@ import os
 import uuid
 from pydantic import BaseModel
 import fitz
-nltk.download('punkt_tab')
+nltk.download('punkt')
 
 
 app = FastAPI()
@@ -29,20 +29,28 @@ class RetrieveRequest(BaseModel):
 @app.post('/ingest')
 def ingestData(request: IngestRequest):
     filePath = request.filePath
-    index = filePath.find('.')
+
     content = ""
-    if index != -1:
-        extension = filePath[index + 1:]
-        match extension:
-            case 'txt':
-                content = readTxt(filePath)
-            case 'pdf':
-                content = readPdf(filePath)
-            case _:
-                return f"File extension not supported: {extension}."
+
+    extension = os.path.splitext(filePath)[1].lower().replace('.', '')
+    match extension:
+        case 'txt':
+            content = readTxt(filePath)
+        case 'pdf':
+            content = readPdf(filePath)
+        case _:
+            return f"File extension not supported: {extension}."
     chunks = chunk(content)
-    embed = embedding(chunks)
-    storeInDB(embed, chunks, filePath) 
+    text_only_list = [c["text"] if isinstance(c, dict) else c for c in chunks]
+    metadatas = []
+    for c in chunks:
+        m = {"source": filePath}
+        if isinstance(c, dict):
+            m["page"] = c["page"]
+        metadatas.append(m)
+
+    embeds = embedding(text_only_list)
+    storeInDB(embeds, text_only_list, metadatas, filePath) 
             
 @app.post('/retrieve')
 def retrieveData(request: RetrieveRequest):
@@ -56,13 +64,14 @@ def readPdf(filePath):
     try:
         doc = fitz.open(filePath)
         text_content = ""
+        pdf_dict = {}
         for page_num in range(doc.page_count):
             page = doc.load_page(page_num)
-
             # extract text
-            text_content += page.get_text() + "\n"
+            text_content = page.get_text()
+            pdf_dict[page_num] = text_content
 
-        return text_content
+        return pdf_dict
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"File: {filePath} not found.")
     except Exception as e:
@@ -83,7 +92,24 @@ def chunk(content, max_chars=1000, sentence_overlap=2):
     Split text into overlapping chunks, preferring sentence boundaries.
     Overlap is done with whole sentences (not characters).
     """
-    if not content.strip():
+
+    # handle pdf case
+    if isinstance(content, dict):
+        all_chunks_with_metadata = []
+        all_chunk = []
+        for page_num, page_text in content.items():
+            if not page_text or not page_text.strip():
+                continue
+            page_chunks = chunk(page_text, max_chars, sentence_overlap)
+            for c in page_chunks:
+                all_chunks_with_metadata.append({
+                    "text": c,
+                    "page": page_num + 1
+                })
+
+        return all_chunks_with_metadata
+    # handle txt case
+    if not content or not content.strip():
         return []
 
     sentences = sent_tokenize(content)
@@ -128,15 +154,14 @@ def embedding(chunks):
     embeddings = model.encode(chunks)
     return embeddings
 
-def storeInDB(embeddings, chunks, filePath):
+def storeInDB(embeddings, chunks, metadatas, filePath):
     uuid_code = uuid.uuid4()
     list_of_ids = [f"{os.path.basename(filePath)}-{uuid_code}-{i}" for i in range(len(chunks))]
-    list_of_metadata = [{"source":filePath} for _ in range(len(chunks))]
     collection.add(
         ids=list_of_ids,
         embeddings= embeddings,
         documents = chunks,
-        metadatas = list_of_metadata    
+        metadatas = metadatas    
     )
 
 def retrieveFromDB(embedding):
