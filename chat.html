@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vault AI</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0a; color: #e5e5e5; height: 100vh; display: flex; flex-direction: column; }
+
+/* header */
+.header { padding: 16px 24px; border-bottom: 1px solid #222; display: flex; align-items: center; justify-content: space-between; }
+.header h1 { font-size: 16px; font-weight: 600; color: #fff; }
+.header h1 span { color: #6366f1; }
+.vault-btn { background: #1a1a2e; border: 1px solid #333; color: #aaa; padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.15s; }
+.vault-btn:hover { border-color: #6366f1; color: #e5e5e5; }
+
+/* sidebar / vault panel */
+.vault-panel { display: none; position: fixed; top: 0; right: 0; width: 340px; height: 100%; background: #111; border-left: 1px solid #222; z-index: 10; flex-direction: column; }
+.vault-panel.open { display: flex; }
+.vault-header { padding: 16px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
+.vault-header h2 { font-size: 14px; font-weight: 600; }
+.close-btn { background: none; border: none; color: #666; font-size: 20px; cursor: pointer; padding: 0 4px; }
+.close-btn:hover { color: #fff; }
+
+/* drop zone */
+.drop-zone { margin: 16px; padding: 32px 16px; border: 2px dashed #333; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.2s; }
+.drop-zone:hover, .drop-zone.drag-over { border-color: #6366f1; background: rgba(99,102,241,0.05); }
+.drop-zone p { font-size: 13px; color: #666; }
+.drop-zone p span { color: #6366f1; }
+.drop-zone input { display: none; }
+
+/* file list */
+.file-list { flex: 1; overflow-y: auto; padding: 8px 16px; }
+.file-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px; font-size: 13px; color: #bbb; }
+.file-item:hover { background: #1a1a1a; }
+.file-dot { width: 6px; height: 6px; border-radius: 50%; background: #6366f1; flex-shrink: 0; }
+.file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-status { margin-left: auto; font-size: 11px; color: #555; flex-shrink: 0; }
+.file-status.ingesting { color: #eab308; }
+.file-status.done { color: #22c55e; }
+.empty-state { text-align: center; padding: 32px 16px; color: #444; font-size: 13px; }
+
+/* chat area */
+.chat-area { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.msg { max-width: 720px; width: 100%; margin: 0 auto; line-height: 1.65; font-size: 14.5px; }
+.msg.user { color: #fff; }
+.msg.user .label { font-size: 11px; color: #6366f1; font-weight: 600; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.msg.assistant .label { font-size: 11px; color: #22c55e; font-weight: 600; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.msg.assistant { color: #ccc; }
+.msg.error { color: #ef4444; font-size: 13px; }
+.msg .content { white-space: pre-wrap; word-wrap: break-word; }
+
+/* typing indicator */
+.typing { display: inline-flex; gap: 4px; padding: 4px 0; }
+.typing span { width: 6px; height: 6px; background: #444; border-radius: 50%; animation: blink 1.4s infinite both; }
+.typing span:nth-child(2) { animation-delay: 0.2s; }
+.typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%,80%,100%{opacity:0.3} 40%{opacity:1} }
+
+/* welcome */
+.welcome { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; }
+.welcome h2 { font-size: 20px; font-weight: 600; color: #333; margin-bottom: 8px; }
+.welcome p { font-size: 13px; color: #444; max-width: 400px; line-height: 1.6; }
+
+/* input bar */
+.input-bar { padding: 16px 24px; border-top: 1px solid #222; }
+.input-wrap { max-width: 720px; margin: 0 auto; display: flex; gap: 8px; }
+.input-wrap textarea { flex: 1; background: #1a1a1a; border: 1px solid #333; color: #e5e5e5; padding: 10px 14px; border-radius: 8px; font-size: 14px; font-family: inherit; resize: none; height: 42px; line-height: 1.5; outline: none; transition: border-color 0.15s; }
+.input-wrap textarea:focus { border-color: #6366f1; }
+.input-wrap textarea::placeholder { color: #555; }
+.send-btn { background: #6366f1; border: none; color: #fff; padding: 0 16px; border-radius: 8px; font-size: 14px; cursor: pointer; transition: background 0.15s; flex-shrink: 0; }
+.send-btn:hover { background: #5558e6; }
+.send-btn:disabled { background: #333; color: #555; cursor: not-allowed; }
+.footnote { text-align: center; padding: 8px; font-size: 11px; color: #333; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>Vault</span> AI</h1>
+  <button class="vault-btn" onclick="toggleVault()">Vault</button>
+</div>
+
+<div class="chat-area" id="chat">
+  <div class="welcome">
+    <div>
+      <h2>Vault AI</h2>
+      <p>Drop your documents into the vault, then ask questions. Everything runs locally on your machine — no data leaves your computer.</p>
+    </div>
+  </div>
+</div>
+
+<div class="input-bar">
+  <div class="input-wrap">
+    <textarea id="input" placeholder="Ask something about your documents..." rows="1" onkeydown="handleKey(event)"></textarea>
+    <button class="send-btn" id="sendBtn" onclick="send()">Send</button>
+  </div>
+</div>
+<div class="footnote">Running locally — your data never leaves your machine</div>
+
+<!-- vault panel -->
+<div class="vault-panel" id="vaultPanel">
+  <div class="vault-header">
+    <h2>Document vault</h2>
+    <button class="close-btn" onclick="toggleVault()">&times;</button>
+  </div>
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <p>Drop PDF or TXT here<br>or <span>click to browse</span></p>
+    <input type="file" id="fileInput" accept=".pdf,.txt" multiple onchange="handleFiles(this.files)">
+  </div>
+  <div class="file-list" id="fileList">
+    <div class="empty-state">No documents yet</div>
+  </div>
+</div>
+
+<script>
+const API = 'http://127.0.0.1:8000';
+let isStreaming = false;
+
+// -- vault panel --
+function toggleVault() {
+  const panel = document.getElementById('vaultPanel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) loadFiles();
+}
+
+async function loadFiles() {
+  try {
+    const res = await fetch(`${API}/api/vault/files`);
+    const data = await res.json();
+    const list = document.getElementById('fileList');
+    if (!data.files || data.files.length === 0) {
+      list.innerHTML = '<div class="empty-state">No documents yet</div>';
+      return;
+    }
+    list.innerHTML = data.files.map(f =>
+      `<div class="file-item"><div class="file-dot"></div><div class="file-name">${f}</div><div class="file-status done">ready</div></div>`
+    ).join('');
+  } catch (e) {
+    console.error('Failed to load files:', e);
+  }
+}
+
+// -- drag & drop --
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  handleFiles(e.dataTransfer.files);
+});
+
+async function handleFiles(files) {
+  for (const file of files) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['pdf', 'txt'].includes(ext)) continue;
+
+    addFileToList(file.name, 'ingesting');
+
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const res = await fetch(`${API}/api/vault/upload`, { method: 'POST', body: form });
+      if (res.ok) {
+        updateFileStatus(file.name, 'done', 'ready');
+      } else {
+        updateFileStatus(file.name, 'error', 'failed');
+      }
+    } catch (e) {
+      updateFileStatus(file.name, 'error', 'failed');
+    }
+  }
+}
+
+function addFileToList(name, status) {
+  const list = document.getElementById('fileList');
+  const empty = list.querySelector('.empty-state');
+  if (empty) empty.remove();
+
+  const div = document.createElement('div');
+  div.className = 'file-item';
+  div.id = `file-${name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  div.innerHTML = `<div class="file-dot"></div><div class="file-name">${name}</div><div class="file-status ${status}">${status === 'ingesting' ? 'processing...' : 'ready'}</div>`;
+  list.prepend(div);
+}
+
+function updateFileStatus(name, cls, text) {
+  const id = `file-${name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const el = document.getElementById(id);
+  if (!el) return;
+  const s = el.querySelector('.file-status');
+  s.className = `file-status ${cls}`;
+  s.textContent = text;
+}
+
+// -- chat --
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    send();
+  }
+}
+
+async function send() {
+  const input = document.getElementById('input');
+  const query = input.value.trim();
+  if (!query || isStreaming) return;
+
+  // remove welcome
+  const welcome = document.querySelector('.welcome');
+  if (welcome) welcome.remove();
+
+  // add user message
+  addMessage('user', query);
+  input.value = '';
+
+  // add assistant placeholder with typing indicator
+  const assistantEl = addMessage('assistant', '');
+  const contentEl = assistantEl.querySelector('.content');
+  contentEl.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+
+  isStreaming = true;
+  document.getElementById('sendBtn').disabled = true;
+
+  try {
+    const res = await fetch(`${API}/api/chat/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
+    contentEl.textContent = '';
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const text = decoder.decode(value, { stream: true });
+      contentEl.textContent += text;
+      // auto scroll
+      document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
+    }
+  } catch (e) {
+    contentEl.textContent = '';
+    addMessage('error', `Failed to get response: ${e.message}`);
+  } finally {
+    isStreaming = false;
+    document.getElementById('sendBtn').disabled = false;
+    input.focus();
+  }
+}
+
+function addMessage(role, text) {
+  const chat = document.getElementById('chat');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  const label = role === 'user' ? 'You' : role === 'error' ? 'Error' : 'Vault AI';
+  div.innerHTML = `<div class="label">${label}</div><div class="content">${text}</div>`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+</script>
+</body>
+</html>

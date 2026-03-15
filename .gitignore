@@ -1,0 +1,8 @@
+venv/
+__pycache__/
+*.py[cod]
+vault/
+# Use a leading slash or the full path to ensure it catches the right folder
+services/inference/blobs/
+services/inference/*.gguf
+services/ingestion/chroma_storage/
