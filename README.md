@@ -18,7 +18,7 @@ Built with a three-service microservices architecture using FastAPI, ChromaDB, a
 ┌─────────────────────────────────────────────────────────┐
 │              Orchestrator (FastAPI :8000)               │
 │                                                         │
-│  • Central API, single point of contact for the GUI    │
+│  • Central API, single point of contact for the GUI     │
 │  • Watches /vault folder for new files (watchdog)       │
 │  • Routes queries to Ingestion → Inference              │
 │  • Streams responses back to the browser                │
