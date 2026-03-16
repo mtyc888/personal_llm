@@ -1,6 +1,6 @@
-# Vault AI — Private RAG Assistant
+# Vault AI, Private RAG Assistant
 
-A privacy-first, offline AI assistant that answers questions grounded in your personal documents. Everything runs locally on your machine — no API keys, no cloud, no data leaves your computer.
+A privacy-first, offline AI assistant that answers questions grounded in your personal documents. Everything runs locally on your machine, no API keys, no cloud, no data leaves your computer.
 
 Built with a three-service microservices architecture using FastAPI, ChromaDB, and Ollama.
 
@@ -18,7 +18,7 @@ Built with a three-service microservices architecture using FastAPI, ChromaDB, a
 ┌─────────────────────────────────────────────────────────┐
 │              Orchestrator (FastAPI :8000)               │
 │                                                         │
-│  • Central API — single point of contact for the GUI    │
+│  • Central API, single point of contact for the GUI    │
 │  • Watches /vault folder for new files (watchdog)       │
 │  • Routes queries to Ingestion → Inference              │
 │  • Streams responses back to the browser                │
@@ -100,15 +100,15 @@ pip install ollama
 Open three terminals:
 
 ```bash
-# Terminal 1 — Orchestrator (port 8000)
+# Terminal 1 : Orchestrator (port 8000)
 cd orchestrator
 uvicorn main:app --port 8000
 
-# Terminal 2 — Inference (port 8001)
+# Terminal 2 : Inference (port 8001)
 cd inference
 uvicorn main:app --port 8001
 
-# Terminal 3 — Ingestion (port 8002)
+# Terminal 3 : Ingestion (port 8002)
 cd ingestion
 uvicorn main:app --port 8002
 ```
