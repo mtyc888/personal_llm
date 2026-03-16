@@ -1,80 +1,180 @@
-The app runs on 3 different services, orchestrator, ingestion and inference. They communicate over internal network ports (eg, localhost:8000, 8001, 8002)
---------------------------------------------------------------------------------------------
-Orchestrator (Django):
+# Vault AI — Private RAG Assistant
 
-Central Django application, manages the database which stores user profiles, file metadata (which PDFs are in the vault), and chat history.
+A privacy-first, offline AI assistant that answers questions grounded in your personal documents. Everything runs locally on your machine — no API keys, no cloud, no data leaves your computer.
 
-Responsibilities:
+Built with a three-service microservices architecture using FastAPI, ChromaDB, and Ollama.
 
-- monitors the 'vault' folder, when user drops a file in, it notices and triggers the Ingestion service
+![Python](https://img.shields.io/badge/Python-3.10+-blue) ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green) ![Ollama](https://img.shields.io/badge/Ollama-local%20LLM-orange)
 
-- receives user input from GUI, fetches relevant metadata and sends a "package" of information to the Inference service
+---
 
-- single point of contact for GUI and the backend services
----------------------------------------------------------------------------------------------
-Ingestion (FastAPI):
+## Architecture
 
-responsible for turning unstructure data (like a 300-page PDF) into structure data that can be searched.
+```
+┌─────────────────────────────────────────────────────────┐
+│                     Browser (GUI)                       │
+│              Upload files · Ask questions                │
+└──────────────────────┬──────────────────────────────────┘
+                       │ HTTP
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│              Orchestrator (FastAPI :8000)                │
+│                                                         │
+│  • Central API — single point of contact for the GUI    │
+│  • Watches /vault folder for new files (watchdog)       │
+│  • Routes queries to Ingestion → Inference              │
+│  • Streams responses back to the browser                │
+└──────────┬──────────────────────────────┬───────────────┘
+           │                              │
+           ▼                              ▼
+┌────────────────────────┐  ┌────────────────────────────┐
+│ Ingestion (FastAPI :8002)│  │ Inference (FastAPI :8001)  │
+│                        │  │                            │
+│ • Extracts text from   │  │ • Takes user query +       │
+│   PDFs and TXT files   │  │   retrieved snippets       │
+│ • Chunks documents     │  │ • Feeds to local LLM       │
+│   into paragraphs      │  │   via Ollama               │
+│ • Generates vector     │  │ • Streams response         │
+│   embeddings           │  │   token-by-token           │
+│ • Stores in ChromaDB   │  │                            │
+│ • Retrieves relevant   │  │                            │
+│   chunks via similarity│  │                            │
+│   search               │  │                            │
+└────────────────────────┘  └────────────────────────────┘
+```
 
-Responsibilities:
+---
 
-- extracting raw text from PDFs, Word docs and PDF files
+## How it works
 
-- break long book into smaller paragraphs
+1. **Drop a file** into the vault (drag & drop via the GUI, or place directly in the `/vault` folder).
+2. **Orchestrator** detects the new file via `watchdog` and triggers the Ingestion service.
+3. **Ingestion** extracts text, chunks it into paragraphs with sentence overlap, generates vector embeddings using `all-MiniLM-L6-v2`, and stores them in ChromaDB.
+4. **User asks a question** via the browser.
+5. **Orchestrator** sends the query to Ingestion, which performs similarity search and returns the top 3 most relevant document chunks.
+6. **Orchestrator** forwards the query + chunks to the Inference service.
+7. **Inference** feeds the context and question to a local LLM via Ollama and streams the response token-by-token.
+8. **Browser** displays the answer in real time as it generates.
 
-- using a small embedding model to turn text chunks into vectors (long lists of numbers representing the meaning of the text)
+---
 
-- save the numbers into db
----------------------------------------------------------------------------------------------
-Inference (FastAPI):
+## Tech stack
 
-this is where the LLM lives. This services generates the content
+| Component | Technology |
+|-----------|-----------|
+| Orchestrator | Python, FastAPI, watchdog, httpx |
+| Ingestion | Python, FastAPI, PyMuPDF (fitz), NLTK, sentence-transformers, ChromaDB |
+| Inference | Python, FastAPI, Ollama |
+| Embedding model | all-MiniLM-L6-v2 (runs locally) |
+| LLM | llama3.2:1b via Ollama (runs locally, swappable) |
+| Vector database | ChromaDB (persistent, file-based) |
+| Frontend | Single-file HTML/CSS/JS (no build tools) |
 
-Responsibilities:
+---
 
-- It takes the user input and the relevant snippets found by Ingestion service
+## Setup
 
-- reads the snippets to ensure the answer is grounded to user's personal files
+### Prerequisites
 
-- generate content
+- Python 3.10+
+- [Ollama](https://ollama.ai) installed and running
+- Pull a model: `ollama pull llama3.2:1b` (or `llama3.1` for better quality on powerful hardware)
 
-- send the answer back to orchestrator piece by piece so the user sees the text "typing" in real time
----------------------------------------------------------------------------------------------
-How they work together:
+### Installation
 
-1) User types: "How do I start a Django project?" into the GUI.
+```bash
+# Clone the repo
+git clone https://github.com/YOUR_USERNAME/vault-ai.git
+cd vault-ai
 
-2) Orchestrator receives the query and asks the Ingestion Service: "Find me chunks related to 'starting Django' in the vault."
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate        # macOS/Linux
+# venv\Scripts\activate         # Windows
 
-3) Ingestion Service returns 3 snippets from Python Crash Course.
+# Install dependencies
+pip install fastapi uvicorn httpx watchdog pydantic
+pip install sentence-transformers chromadb nltk pymupdf
+pip install ollama
+```
 
-4) Orchestrator sends the Question + 3 Snippets to the Inference Service.
+### Running
 
-5) Inference Service generates the answer and sends it back.
+Open three terminals:
 
-6) Orchestrator saves the conversation to SQLite and displays it in the GUI.
+```bash
+# Terminal 1 — Orchestrator (port 8000)
+cd orchestrator
+uvicorn main:app --port 8000
 
-Basically:
+# Terminal 2 — Inference (port 8001)
+cd inference
+uvicorn main:app --port 8001
 
-1) Electron GUI: Sends user query to Orchestrator (POST /ask).
+# Terminal 3 — Ingestion (port 8002)
+cd ingestion
+uvicorn main:app --port 8002
+```
 
-2) Orchestrator: Asks Ingestion to "Find 3 relevant paragraphs for this query."
+Then open `frontend/index.html` in your browser (or serve it):
 
-3) Ingestion: Searches the Vector DB and returns the text snippets.
+```bash
+cd frontend
+python -m http.server 3000
+# Open http://localhost:3000
+```
 
-4) Orchestrator: Sends those snippets + the original question to Inference.
+---
 
-5) Inference: Returns the final grounded answer.
+## Usage
 
-6) Orchestrator: Saves the answer to the database and sends it back to Electron.
+1. Click **Vault** in the top right corner.
+2. Drag and drop a PDF or TXT file. Wait for the status to show **ready**.
+3. Close the vault panel.
+4. Type a question about your documents and press Enter.
+5. Watch the answer stream in real time.
 
-Note: GUI will be built with Electron.js
+---
 
----------------------------------------------------------------------------------------------
-Things to consider:
+## Project structure
 
-Concurrency: Managing a long-running LLM generation while keeping the UI responsive.
+```
+vault-ai/
+├── orchestrator/
+│   └── main.py          # Central API, vault watcher, request routing
+├── ingestion/
+│   └── main.py          # Text extraction, chunking, embedding, vector storage
+├── inference/
+│   └── main.py          # LLM inference via Ollama with streaming
+├── frontend/
+│   └── index.html       # Single-file browser GUI
+├── vault/               # Drop documents here (auto-created)
+└── README.md
+```
 
-Inter-Process Communication (ICP): How GUI (Electron/JavaScript) talks to Orchestrator (Django/Python) via HTTP.
+---
 
-System Design: Deciding which service owns the data
+## Design decisions
+
+**Why microservices?** Each service has a distinct responsibility and can be developed, tested, and scaled independently. The ingestion service is CPU-bound (embedding), the inference service is GPU-bound (LLM), and the orchestrator is I/O-bound (routing). Separating them prevents a slow LLM generation from blocking file ingestion.
+
+**Why local-only?** Privacy. Personal documents (journals, financial records, notes) should never leave the user's machine. Running Ollama locally means zero API keys, zero cloud dependency, and zero data leakage.
+
+**Why ChromaDB?** Lightweight, file-based, no server setup required. Supports persistent storage and cosine similarity search out of the box. Ideal for a local application.
+
+**Why streaming?** User experience. Without streaming, the user stares at a blank screen for 10-30 seconds while the LLM generates. Streaming shows tokens as they're produced, making the app feel responsive even on slower hardware.
+
+---
+
+## Limitations
+
+- Supports PDF and TXT files only (no DOCX, EPUB, or images).
+- No authentication or multi-user support (designed for personal use).
+- Answer quality depends on the local LLM model size and hardware.
+- No conversation memory across sessions (each query is independent).
+
+---
+
+## License
+
+MIT

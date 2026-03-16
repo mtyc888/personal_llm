@@ -18,6 +18,9 @@ VAULT_PATH = os.environ.get("VAULT_PATH", "./vault")
 INGESTION_URL = "http://127.0.0.1:8002"
 INFERENCE_URL = "http://127.0.0.1:8001"
 
+"""
+    watch dog implementation, watching "vault" folder
+"""
 class MyHandler(FileSystemEventHandler):
     def on_created(self, event):
         if event.is_directory:
@@ -61,7 +64,8 @@ async def lifespan(app: FastAPI):
     observer.join()
 
 app = FastAPI(lifespan=lifespan)
-app = FastAPI(lifespan=lifespan)
+
+# CORS middleware, allowing all traffic since it's only a demo
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 class AskReq(BaseModel):
@@ -69,7 +73,9 @@ class AskReq(BaseModel):
 
 class IngestRequest(BaseModel):
     filePath: str
-
+"""
+    This returns all the file names in the vault folder
+"""
 @app.get('/api/vault/files')
 async def getFiles():
     try:
@@ -82,7 +88,9 @@ async def getFiles():
         return JSONResponse(status_code=200, content={"files":files})
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting the files from {VAULT_PATH}: {e}")
-
+"""
+    When user uploads a file on the frontend, it uploads the file into vault folder by writing into it.
+"""
 @app.post('/api/vault/upload')
 async def upload(file: UploadFile = File(...)):
     try:
@@ -94,7 +102,9 @@ async def upload(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error uploading file: {e}.")
 
-
+"""
+    This endpoint would get the file name that was uploaded to vault and call the ingestion service.
+"""
 @app.post('/api/vault/ingest')
 async def ingest(request: IngestRequest):
     try:
@@ -110,7 +120,10 @@ async def ingest(request: IngestRequest):
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {e}")
-
+"""
+    This endpoint will take user's query, retrieve context from ingestion service, 
+    then give the related context to inference service to query the LLM for an reply.
+"""
 @app.post('/api/chat/ask')
 async def ask(request: AskReq):
     query = request.query
