@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vault AI</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Outfit', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      },
+      colors: {
+        vault: {
+          50: '#eef2ff',
+          100: '#e0e7ff',
+          400: '#818cf8',
+          500: '#6366f1',
+          600: '#4f46e5',
+          700: '#4338ca',
+          900: '#1e1b4b',
+        },
+        surface: {
+          0: '#09090b',
+          50: '#0c0c0f',
+          100: '#121215',
+          200: '#18181b',
+          300: '#1e1e22',
+          400: '#27272a',
+          500: '#3f3f46',
+          600: '#52525b',
+          700: '#71717a',
+          800: '#a1a1aa',
+          900: '#d4d4d8',
+          950: '#fafafa',
+        }
+      },
+      animation: {
+        'fade-in': 'fadeIn 0.4s ease-out',
+        'slide-in': 'slideIn 0.3s ease-out',
+        'pulse-soft': 'pulseSoft 2s ease-in-out infinite',
+        'dot-bounce': 'dotBounce 1.4s infinite ease-in-out both',
+      },
+      keyframes: {
+        fadeIn: { '0%': { opacity: '0', transform: 'translateY(8px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+        slideIn: { '0%': { opacity: '0', transform: 'translateY(12px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+        pulseSoft: { '0%, 100%': { opacity: '0.4' }, '50%': { opacity: '1' } },
+        dotBounce: { '0%, 80%, 100%': { transform: 'scale(0.6)', opacity: '0.3' }, '40%': { transform: 'scale(1)', opacity: '1' } },
+      }
+    }
+  }
+}
+</script>
+<style>
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+  textarea { field-sizing: content; min-height: 44px; max-height: 160px; }
+  .input-glow:focus { box-shadow: 0 0 0 1px rgba(99,102,241,0.5), 0 0 20px rgba(99,102,241,0.08); }
+  .status-ingesting::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #eab308; margin-right: 6px; animation: pulseSoft 1.5s ease-in-out infinite; }
+  .status-ready::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #22c55e; margin-right: 6px; }
+  .status-failed::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #ef4444; margin-right: 6px; }
+  .drop-active { border-color: #6366f1 !important; background: rgba(99,102,241,0.04) !important; }
+</style>
+</head>
+
+<body class="h-full bg-surface-0 text-surface-900 font-sans flex flex-col overflow-hidden">
+
+  <!-- header -->
+  <header class="flex items-center justify-between px-6 py-3.5 border-b border-surface-300/50 bg-surface-50/80 backdrop-blur-sm z-20 shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-vault-500 to-vault-700 flex items-center justify-center shadow-lg shadow-vault-500/20">
+        <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-sm font-semibold tracking-tight text-surface-950">Vault <span class="text-vault-400">AI</span></h1>
+        <p class="text-[10px] text-surface-600 tracking-wide font-mono uppercase">Local RAG assistant</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-200/50 mr-2">
+        <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse-soft"></div>
+        <span class="text-[10px] font-mono text-surface-600 uppercase tracking-wider">Local</span>
+      </div>
+      <button onclick="toggleVault()" class="group flex items-center gap-2 px-3.5 py-2 rounded-lg bg-surface-200 border border-surface-300/50 hover:border-vault-500/30 hover:bg-surface-300 transition-all duration-200 text-sm font-medium text-surface-800">
+        <svg class="w-4 h-4 text-surface-600 group-hover:text-vault-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"/>
+        </svg>
+        Vault
+        <span id="fileCount" class="hidden ml-0.5 text-[10px] font-mono bg-vault-500/20 text-vault-400 px-1.5 py-0.5 rounded">0</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- chat area -->
+  <main class="flex-1 overflow-y-auto" id="chat">
+    <div id="welcome" class="h-full flex items-center justify-center px-6">
+      <div class="text-center max-w-md animate-fade-in">
+        <div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-vault-500/20 to-vault-700/20 border border-vault-500/10 flex items-center justify-center">
+          <svg class="w-8 h-8 text-vault-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z"/>
+          </svg>
+        </div>
+        <h2 class="text-xl font-semibold text-surface-900 mb-2">Ask your documents anything</h2>
+        <p class="text-sm text-surface-600 leading-relaxed mb-8">Drop files into the vault, then ask questions. Your data stays on your machine — powered by a local LLM, no cloud, no API keys.</p>
+        <div class="flex items-center justify-center gap-6 text-[11px] font-mono text-surface-500 uppercase tracking-wider">
+          <span class="flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg>
+            Private
+          </span>
+          <span class="flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"/></svg>
+            Offline
+          </span>
+          <span class="flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+            Streaming
+          </span>
+        </div>
+      </div>
+    </div>
+    <div id="messages" class="hidden flex-col gap-1 py-6"></div>
+  </main>
+
+  <!-- input bar -->
+  <footer class="shrink-0 border-t border-surface-300/50 bg-surface-50/80 backdrop-blur-sm px-6 py-4">
+    <div class="max-w-3xl mx-auto">
+      <div class="flex gap-3 items-end">
+        <div class="flex-1">
+          <textarea id="input" placeholder="Ask something about your documents..." rows="1" onkeydown="handleKey(event)"
+            class="input-glow w-full bg-surface-200 border border-surface-300/80 text-surface-950 placeholder-surface-500 px-4 py-3 rounded-xl text-sm font-normal resize-none outline-none transition-all duration-200 focus:border-vault-500/50"></textarea>
+        </div>
+        <button id="sendBtn" onclick="send()"
+          class="h-[44px] px-5 rounded-xl bg-vault-500 hover:bg-vault-600 disabled:bg-surface-300 disabled:text-surface-500 text-white text-sm font-medium transition-all duration-200 flex items-center gap-2 shadow-lg shadow-vault-500/20 hover:shadow-vault-500/30 disabled:shadow-none">
+          <span>Send</span>
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
+        </button>
+      </div>
+      <p class="text-center mt-2.5 text-[10px] font-mono text-surface-500 tracking-wider uppercase">Responses grounded in your documents only</p>
+    </div>
+  </footer>
+
+  <!-- overlay -->
+  <div id="overlay" onclick="toggleVault()" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-30"></div>
+
+  <!-- vault panel -->
+  <aside id="vaultPanel" class="fixed top-0 right-0 w-[380px] h-full bg-surface-100 border-l border-surface-300/50 z-40 translate-x-full transition-transform duration-300 ease-out flex flex-col">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-surface-300/50">
+      <div class="flex items-center gap-2.5">
+        <div class="w-7 h-7 rounded-lg bg-vault-500/10 flex items-center justify-center">
+          <svg class="w-4 h-4 text-vault-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"/>
+          </svg>
+        </div>
+        <div>
+          <h2 class="text-sm font-semibold text-surface-900">Document vault</h2>
+          <p id="vaultSubtext" class="text-[10px] font-mono text-surface-600 uppercase tracking-wider">No files</p>
+        </div>
+      </div>
+      <button onclick="toggleVault()" class="w-8 h-8 rounded-lg hover:bg-surface-300 flex items-center justify-center transition-colors text-surface-600 hover:text-surface-900">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="px-5 pt-5 pb-2">
+      <div id="dropZone" onclick="document.getElementById('fileInput').click()"
+        class="border-2 border-dashed border-surface-400/50 hover:border-vault-500/50 rounded-xl p-8 text-center cursor-pointer transition-all duration-200 group">
+        <div class="w-10 h-10 mx-auto mb-3 rounded-xl bg-surface-300/50 group-hover:bg-vault-500/10 flex items-center justify-center transition-colors">
+          <svg class="w-5 h-5 text-surface-600 group-hover:text-vault-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+          </svg>
+        </div>
+        <p class="text-xs text-surface-700 font-medium mb-1">Drop PDF or TXT files here</p>
+        <p class="text-[11px] text-surface-500">or <span class="text-vault-400">click to browse</span></p>
+        <input type="file" id="fileInput" accept=".pdf,.txt" multiple onchange="handleFiles(this.files)" class="hidden">
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-5 py-3" id="fileList">
+      <div id="emptyState" class="flex flex-col items-center justify-center h-full text-center">
+        <div class="w-12 h-12 rounded-xl bg-surface-200 flex items-center justify-center mb-3">
+          <svg class="w-6 h-6 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+          </svg>
+        </div>
+        <p class="text-xs text-surface-500">No documents yet</p>
+        <p class="text-[10px] text-surface-600 mt-1">Upload files to get started</p>
+      </div>
+    </div>
+  </aside>
+
+<script>
+const API = 'http://127.0.0.1:8000';
+let isStreaming = false;
+let vaultOpen = false;
+
+function toggleVault() {
+  const panel = document.getElementById('vaultPanel');
+  const overlay = document.getElementById('overlay');
+  vaultOpen = !vaultOpen;
+  if (vaultOpen) {
+    panel.classList.remove('translate-x-full');
+    overlay.classList.remove('hidden');
+    loadFiles();
+  } else {
+    panel.classList.add('translate-x-full');
+    overlay.classList.add('hidden');
+  }
+}
+
+async function loadFiles() {
+  try {
+    const res = await fetch(`${API}/api/vault/files`);
+    const data = await res.json();
+    const list = document.getElementById('fileList');
+    const sub = document.getElementById('vaultSubtext');
+    const badge = document.getElementById('fileCount');
+    if (!data.files || data.files.length === 0) {
+      sub.textContent = 'No files';
+      badge.classList.add('hidden');
+      return;
+    }
+    sub.textContent = `${data.files.length} file${data.files.length > 1 ? 's' : ''} indexed`;
+    badge.textContent = data.files.length;
+    badge.classList.remove('hidden');
+    const empty = document.getElementById('emptyState');
+    if (empty) empty.remove();
+    list.innerHTML = data.files.map(f => fileItemHTML(f, 'ready')).join('');
+  } catch (e) { console.error('Failed to load files:', e); }
+}
+
+function fileItemHTML(name, status) {
+  const isPdf = name.toLowerCase().endsWith('.pdf');
+  const icon = isPdf
+    ? `<svg class="w-4 h-4 text-red-400/70 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>`
+    : `<svg class="w-4 h-4 text-blue-400/70 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>`;
+  const sClass = status === 'ready' ? 'status-ready' : status === 'ingesting' ? 'status-ingesting' : 'status-failed';
+  const sText = status === 'ready' ? 'Indexed' : status === 'ingesting' ? 'Processing...' : 'Failed';
+  const id = `file-${name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  return `<div id="${id}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-200/50 transition-colors animate-fade-in">
+    ${icon}
+    <span class="flex-1 text-xs text-surface-800 truncate font-medium">${name}</span>
+    <span class="text-[10px] font-mono text-surface-600 ${sClass}">${sText}</span>
+  </div>`;
+}
+
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drop-active'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drop-active'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drop-active'); handleFiles(e.dataTransfer.files); });
+
+async function handleFiles(files) {
+  for (const file of files) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['pdf', 'txt'].includes(ext)) continue;
+    addFileToList(file.name, 'ingesting');
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const res = await fetch(`${API}/api/vault/upload`, { method: 'POST', body: form });
+      updateFileStatus(file.name, res.ok ? 'ready' : 'failed', res.ok ? 'Indexed' : 'Failed');
+    } catch (e) { updateFileStatus(file.name, 'failed', 'Failed'); }
+  }
+  loadFiles();
+}
+
+function addFileToList(name, status) {
+  const list = document.getElementById('fileList');
+  const empty = document.getElementById('emptyState');
+  if (empty) empty.remove();
+  list.insertAdjacentHTML('afterbegin', fileItemHTML(name, status));
+}
+
+function updateFileStatus(name, status, text) {
+  const id = `file-${name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const el = document.getElementById(id);
+  if (!el) return;
+  const s = el.querySelector('span:last-child');
+  const sClass = status === 'ready' ? 'status-ready' : status === 'failed' ? 'status-failed' : 'status-ingesting';
+  s.className = `text-[10px] font-mono text-surface-600 ${sClass}`;
+  s.textContent = text;
+}
+
+function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
+
+async function send() {
+  const input = document.getElementById('input');
+  const query = input.value.trim();
+  if (!query || isStreaming) return;
+  const welcome = document.getElementById('welcome');
+  const messages = document.getElementById('messages');
+  if (welcome && !welcome.classList.contains('hidden')) {
+    welcome.classList.add('hidden');
+    messages.classList.remove('hidden');
+    messages.classList.add('flex');
+  }
+  addMessage('user', query);
+  input.value = '';
+  const assistantEl = addMessage('assistant', '');
+  const contentEl = assistantEl.querySelector('.msg-content');
+  contentEl.innerHTML = `<div class="flex items-center gap-1.5 py-1">
+    <div class="w-1.5 h-1.5 rounded-full bg-vault-400 animate-dot-bounce"></div>
+    <div class="w-1.5 h-1.5 rounded-full bg-vault-400 animate-dot-bounce" style="animation-delay:0.16s"></div>
+    <div class="w-1.5 h-1.5 rounded-full bg-vault-400 animate-dot-bounce" style="animation-delay:0.32s"></div>
+  </div>`;
+  isStreaming = true;
+  document.getElementById('sendBtn').disabled = true;
+  try {
+    const res = await fetch(`${API}/api/chat/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+    const contentType = res.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+        // Non-streaming fallback response
+        const data = await res.json();
+        contentEl.textContent = data.message;
+    } else {
+        // Streaming response — existing code
+        contentEl.textContent = '';
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            contentEl.textContent += decoder.decode(value, { stream: true });
+            document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
+        }
+    }
+  } catch (e) {
+    contentEl.textContent = '';
+    addMessage('error', `Connection failed: ${e.message}`);
+  } finally {
+    isStreaming = false;
+    document.getElementById('sendBtn').disabled = false;
+    input.focus();
+  }
+}
+
+function addMessage(role, text) {
+  const container = document.getElementById('messages');
+  const div = document.createElement('div');
+  if (role === 'user') {
+    div.className = 'max-w-3xl w-full mx-auto px-6 py-3 animate-fade-in';
+    div.innerHTML = `<div class="flex items-start gap-3">
+      <div class="w-7 h-7 rounded-lg bg-surface-300 flex items-center justify-center shrink-0 mt-0.5">
+        <svg class="w-3.5 h-3.5 text-surface-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-[10px] font-mono text-surface-500 uppercase tracking-wider mb-1">You</p>
+        <p class="text-sm text-surface-950 leading-relaxed">${escapeHTML(text)}</p>
+      </div>
+    </div>`;
+  } else if (role === 'assistant') {
+    div.className = 'max-w-3xl w-full mx-auto px-6 py-3 animate-fade-in';
+    div.innerHTML = `<div class="flex items-start gap-3">
+      <div class="w-7 h-7 rounded-lg bg-vault-500/15 flex items-center justify-center shrink-0 mt-0.5">
+        <svg class="w-3.5 h-3.5 text-vault-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-[10px] font-mono text-vault-400 uppercase tracking-wider mb-1">Vault AI</p>
+        <div class="msg-content text-sm text-surface-800 leading-relaxed whitespace-pre-wrap">${text}</div>
+      </div>
+    </div>`;
+  } else {
+    div.className = 'max-w-3xl w-full mx-auto px-6 py-2 animate-fade-in';
+    div.innerHTML = `<p class="text-xs text-red-400/80 font-mono ml-10">${escapeHTML(text)}</p>`;
+  }
+  container.appendChild(div);
+  document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
+  return div;
+}
+
+function escapeHTML(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+</script>
+</body>
+</html>

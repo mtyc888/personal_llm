@@ -4,8 +4,6 @@ A privacy-first, offline AI assistant that answers questions grounded in your pe
 
 Built with a three-service microservices architecture using FastAPI, ChromaDB, and Ollama.
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue) ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green) ![Ollama](https://img.shields.io/badge/Ollama-local%20LLM-orange)
-
 ---
 
 ## Architecture
@@ -13,12 +11,12 @@ Built with a three-service microservices architecture using FastAPI, ChromaDB, a
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                     Browser (GUI)                       │
-│              Upload files · Ask questions                │
+│              Upload files · Ask questions               │
 └──────────────────────┬──────────────────────────────────┘
                        │ HTTP
                        ▼
 ┌─────────────────────────────────────────────────────────┐
-│              Orchestrator (FastAPI :8000)                │
+│              Orchestrator (FastAPI :8000)               │
 │                                                         │
 │  • Central API — single point of contact for the GUI    │
 │  • Watches /vault folder for new files (watchdog)       │
@@ -28,7 +26,7 @@ Built with a three-service microservices architecture using FastAPI, ChromaDB, a
            │                              │
            ▼                              ▼
 ┌────────────────────────┐  ┌────────────────────────────┐
-│ Ingestion (FastAPI :8002)│  │ Inference (FastAPI :8001)  │
+│ Ingestion (8002)       │  │  Inference (8001)          │
 │                        │  │                            │
 │ • Extracts text from   │  │ • Takes user query +       │
 │   PDFs and TXT files   │  │   retrieved snippets       │
@@ -60,15 +58,14 @@ Built with a three-service microservices architecture using FastAPI, ChromaDB, a
 
 ## Tech stack
 
-| Component | Technology |
-|-----------|-----------|
-| Orchestrator | Python, FastAPI, watchdog, httpx |
-| Ingestion | Python, FastAPI, PyMuPDF (fitz), NLTK, sentence-transformers, ChromaDB |
-| Inference | Python, FastAPI, Ollama |
-| Embedding model | all-MiniLM-L6-v2 (runs locally) |
-| LLM | llama3.2:1b via Ollama (runs locally, swappable) |
-| Vector database | ChromaDB (persistent, file-based) |
-| Frontend | Single-file HTML/CSS/JS (no build tools) |
+
+  Orchestrator : Python, FastAPI, watchdog, httpx 
+  Ingestion : Python, FastAPI, PyMuPDF (fitz), NLTK, sentence-transformers, ChromaDB 
+  Inference : Python, FastAPI, Ollama 
+  Embedding model : all-MiniLM-L6-v2 (runs locally) 
+  LLM : llama3.2:1b via Ollama (runs locally, swappable) 
+  Vector database : ChromaDB (persistent, file-based) 
+  Frontend : Single-file HTML/CSS/JS (no build tools) 
 
 ---
 
@@ -84,7 +81,7 @@ Built with a three-service microservices architecture using FastAPI, ChromaDB, a
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/vault-ai.git
+git clone https://github.com/mtyc888/personal_llm.git
 cd vault-ai
 
 # Create virtual environment
@@ -147,7 +144,7 @@ vault-ai/
 ├── inference/
 │   └── main.py          # LLM inference via Ollama with streaming
 ├── frontend/
-│   └── index.html       # Single-file browser GUI
+│   └── chat.html       # Single-file browser GUI
 ├── vault/               # Drop documents here (auto-created)
 └── README.md
 ```
@@ -174,7 +171,3 @@ vault-ai/
 - No conversation memory across sessions (each query is independent).
 
 ---
-
-## License
-
-MIT
