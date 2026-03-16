@@ -82,7 +82,7 @@ Built with a three-service microservices architecture using FastAPI, ChromaDB, a
 ```bash
 # Clone the repo
 git clone https://github.com/mtyc888/personal_llm.git
-cd vault-ai
+cd personal-llm
 
 # Create virtual environment
 python -m venv venv
